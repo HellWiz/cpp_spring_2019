@@ -2,31 +2,15 @@
 
 class _MatrixRow {
 public:
-
-	void ini(const size_t len) {
-		cols = len;
-		elements = new int[cols];
-	}
-
-	void ini(const _MatrixRow& source) {
-		cols = source.cols;
-		elements = new int[cols];
-		for (size_t i=0; i < cols; ++i) {
-			elements[i] = source.elements[i];
-		}
-	}
-
-	_MatrixRow(const _MatrixRow& source) : cols(source.cols) {
-		elements = new int[cols];
-		for (size_t i=0; i < cols; ++i) {
-			elements[i] = source.elements[i];
-		}
-	}
-
 	_MatrixRow() : cols(0), elements(nullptr){}
+
+	_MatrixRow(const size_t len) :cols(len) {
+		elements = new int[cols];
+	}
 
 	~_MatrixRow(){
 		delete[] elements;
+
 	}
 
 	const int& operator[](size_t i) const {
@@ -58,12 +42,11 @@ public:
 		return !(*this == other);
 	}
 
-	_MatrixRow operator *=(const int a) {
+	_MatrixRow& operator *=(const int a) {
 		for (size_t i = 0; i < cols; ++i) {
 			elements[i] *= a;
 		}
-		_MatrixRow tmp(*this);
-		return tmp;
+		return *this;
 	}
 
 private:
@@ -78,15 +61,8 @@ public:
 
 	Matrix(const size_t row, const size_t col) : rows(row), cols(col){
 		lines = new _MatrixRow[rows];
-		for (int i = 0; i < rows; ++i) {
-			lines[i].ini(col);
-		}
-	}
-
-	Matrix(const Matrix& source) : rows(source.rows), cols(source.cols){
-		lines = new _MatrixRow[rows];
-		for (int i = 0; i < rows; ++i) {
-			lines[i].ini(source.lines[i]);
+		for (size_t i = 0; i < rows; ++i) {
+			new (lines+i) _MatrixRow (col);
 		}
 	}
 
@@ -123,12 +99,11 @@ public:
 		return !(*this == other);
 	}
 
-	Matrix operator *=(const int a) {
+	Matrix& operator *=(const int a) {
 		for (size_t i = 0; i < rows; ++i) {
 			lines[i] *= a;
 		}
-		Matrix tmp(*this);
-		return tmp;
+		return *this;
 	}
 
 	size_t getRows() const{
