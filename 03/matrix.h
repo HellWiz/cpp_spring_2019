@@ -60,14 +60,17 @@ class Matrix {
 public:
 
 	Matrix(const size_t row, const size_t col) : rows(row), cols(col){
-		lines = new _MatrixRow[rows];
+		lines = static_cast<_MatrixRow*>(operator new[] (sizeof(_MatrixRow)*rows));
 		for (size_t i = 0; i < rows; ++i) {
 			new (lines+i) _MatrixRow (col);
 		}
 	}
 
 	~Matrix() {
-		delete[] lines;
+		for (size_t i = 0; i < rows; ++i) {
+			lines[i].~_MatrixRow();
+		}
+		operator delete[] (lines);
 	}
 
 	const _MatrixRow& operator[](size_t i) const{
