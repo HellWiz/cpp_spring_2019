@@ -42,6 +42,7 @@ public:
 		moved.value = nullptr;
 		moved.size = 0;
 		moved.capacity = 0;
+		moved.isNegative = false;
 	}
 
 	~BigInt() {
@@ -73,7 +74,7 @@ public:
 		isNegative = moved.isNegative;
 		moved.value = nullptr;
 		moved.capacity = 0;
-		moved.isNegative = 0;
+		moved.isNegative = false;
 		return *this;
 	}
 
@@ -224,27 +225,7 @@ public:
 	}
 
 	bool operator>(const BigInt& other)const {
-		if (this == &other) return false;
-		if (isNegative && !other.isNegative) return false;
-		if (!isNegative && other.isNegative) return true;
-		if (isNegative && other.isNegative) return (-(*this)) < (-other);
-		size_t firstNotNull1 = capacity - 1;
-		size_t firstNotNull2 = other.capacity - 1;
-		for (; firstNotNull1 > 0; --firstNotNull1) {
-			if (value[firstNotNull1] != 0) break;
-		}
-		for (; firstNotNull2 > 0; --firstNotNull2) {
-			if (other.value[firstNotNull2] != 0) break;
-		}
-		if (firstNotNull1 > firstNotNull2) return true;
-		if (firstNotNull1 < firstNotNull2) return false;
-		for (size_t i = firstNotNull1; i > 0; --i) {
-			if (value[i] < other.value[i]) return false;
-			if (value[i] > other.value[i]) return true;
-		}
-		if (value[0] < other.value[0]) return false;
-		if (value[0] > other.value[0]) return true;
-		return false;
+		return ((*this!=other)&& !(*this<other));
 	}
 
 	bool operator<=(const BigInt& other)const {
