@@ -92,6 +92,7 @@ public:
 			tmp.capacity = std::max(capacity, other.capacity) + 1;
 			tmp.isNegative = isNegative;
 			tmp.size = tmp.capacity;
+			delete[] tmp.value;
 			tmp.value = new uint8_t[tmp.capacity];
 			size_t lim = std::min(capacity, other.capacity);
 			uint8_t tonext = 0;
