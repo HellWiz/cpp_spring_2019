@@ -38,6 +38,5 @@ int main() {
 	tPing.join();
 	tPong.join();
 
-	system("pause");
 	return 0;
 }
