@@ -9,22 +9,21 @@
 #include <string>
 
 constexpr auto data = "data.bin";
-constexpr size_t memLim = 8 * 1024 * 1024;
+constexpr size_t memLim = 6 * 1024 * 1024;
 constexpr int threadNum = 2;
 constexpr size_t threadMemLim = memLim / threadNum;
 constexpr size_t threadUintLim = threadMemLim / sizeof(uint64_t);
 
 std::atomic<bool> finished = false;
 std::atomic<int> finishedStep = 0;
-std::atomic<int> queueSwaps = 0;
+std::atomic<int> finishedSort = 0;
 std::condition_variable cond;
-std::mutex inQueM;
+std::mutex sortFinishM;
 std::mutex outQueM;
 std::mutex streamReadM;
 std::mutex iterFinishM;
 
-void prep(uint64_t * locBuf, std::ifstream & dataStream, int id,
-	std::queue<std::string>&inputFiles, std::queue<std::string>&outputFiles) {
+void prep(uint64_t * locBuf, std::ifstream & dataStream, int id, std::queue<std::string>&outputFiles) {
 	int iter = 0;
 	int file = 0;
 	while (!dataStream.eof()) {
@@ -43,8 +42,7 @@ void prep(uint64_t * locBuf, std::ifstream & dataStream, int id,
 	}
 }
 
-void merge(std::string str1, std::string str2, uint64_t * buf, int id,int iter,int file,
-				std::queue<std::string>&inputFiles, std::queue<std::string>&outputFiles) {
+void merge(std::string & str1, std::string & str2, uint64_t * buf, int id,int iter,int file, std::queue<std::string>&outputFiles) {
 	std::ifstream f1(str1, std::ios::binary);
 	std::ifstream f2(str2, std::ios::binary);
 	std::string name = std::to_string(iter) + '_' + std::to_string(id) + '_' + std::to_string(file) + ".bin";
@@ -114,13 +112,12 @@ void merge(std::string str1, std::string str2, uint64_t * buf, int id,int iter,i
 	outputFiles.push(name);
 }
 
-void MTSort(uint64_t * buf, std::ifstream & dataStream, int id,
-						std::queue<std::string>&inputFiles, std::queue<std::string>&outputFiles) {
+void MTSort(uint64_t * buf, std::ifstream & dataStream, int id, std::queue<std::string>&outputFiles) {
 	uint64_t * locBuf = buf + id*threadUintLim;
 	int iter = 0;
 	int file = 0;
 	
-	prep(locBuf, dataStream, id, inputFiles, outputFiles);
+	prep(locBuf, dataStream, id, outputFiles);
 
 	++iter;
 	std::unique_lock<std::mutex> lock(iterFinishM);
@@ -130,73 +127,40 @@ void MTSort(uint64_t * buf, std::ifstream & dataStream, int id,
 		cond.wait(lock);
 	}
 	lock.unlock();
-	if (queueSwaps < iter) {
-		std::unique_lock<std::mutex> qLock(inQueM);
-		if (queueSwaps < iter) {
-			std::swap(inputFiles, outputFiles);
-			++queueSwaps;
+	file = 0;
+	
+	while (outputFiles.size() >= 2) {
+		std::unique_lock<std::mutex> qLock(outQueM);
+		if (outputFiles.size() >= 2) {
+			std::string tmp1 = outputFiles.front();
+			outputFiles.pop();
+			std::string tmp2 = outputFiles.front();
+			outputFiles.pop();
+			qLock.unlock();
+			merge(tmp1, tmp2, locBuf, id, iter, file, outputFiles);
+			++file;
 		}
-		qLock.unlock();
 	}
-
-	while (!finished) {
-		file = 0;
-		while (inputFiles.size() >= 2) {
-			std::unique_lock<std::mutex> qLock(inQueM);
-			if (inputFiles.size() >= 2) {
-				std::string tmp1 = inputFiles.front();
-				inputFiles.pop();
-				std::string tmp2 = inputFiles.front();
-				inputFiles.pop();
-				qLock.unlock();
-				merge(tmp1,tmp2,locBuf,id,iter,file,inputFiles,outputFiles);
-				++file;
-			}
-		}
-		if (inputFiles.size() == 1) {
-			std::unique_lock<std::mutex> qlock(inQueM);
-			std::unique_lock<std::mutex> qlock2(outQueM);
-			if (inputFiles.size() == 1) {
-				outputFiles.push(inputFiles.front());
-				inputFiles.pop();
-			}
-		}
-
-		++iter;
-		std::unique_lock<std::mutex> lock(iterFinishM);
-		++finishedStep;
-		cond.notify_all();
-		while (finishedStep < threadNum*iter) {
-			cond.wait(lock);
-		}
-		lock.unlock();
-		if (queueSwaps < iter) {
-			std::unique_lock<std::mutex> qLock(inQueM);
-			if (queueSwaps < iter) {
-				if (outputFiles.size() < 2) {
-					if (outputFiles.empty()) { std::cerr << "error, no output files" << std::endl; }
-					else std::cout << "finished, result in file: " << outputFiles.front() << std::endl;
-					finished = true;
-				}
-				std::swap(inputFiles, outputFiles);
-				++queueSwaps;
-			}
-		}
+	std::unique_lock<std::mutex> fLock(sortFinishM);
+	++finishedSort;
+	if (finishedSort == threadNum) {
+		if (outputFiles.empty()) { std::cerr << "error, no output files" << std::endl; }
+		else std::cout << "finished, result in file: " << outputFiles.front() << std::endl;
 	}
 }
 
 int main() {
 	uint64_t * buf = new uint64_t[memLim / sizeof(uint64_t)];
 	std::ifstream dataStream(data, std::ios::binary);
-	std::queue<std::string> inputFiles;
 	std::queue<std::string> outputFiles;
 	std::vector<std::thread> threads;
 	for (int i = 0; i < threadNum; ++i) {
-		threads.push_back(std::thread(MTSort, std::ref(buf), std::ref(dataStream), i, std::ref(inputFiles), std::ref(outputFiles)));
+		threads.emplace_back(MTSort, std::ref(buf), std::ref(dataStream), i, std::ref(outputFiles));
 	}
 	for (int i = 0; i < threadNum; ++i) {
 		threads[i].join();
 	}
+	delete[] buf;
 	system("pause");
 	return 0;
 }
