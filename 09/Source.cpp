@@ -23,8 +23,8 @@ std::mutex outQueM;
 std::mutex streamReadM;
 std::mutex iterFinishM;
 
-void prep(uint64_t * locBuf, std::ifstream & dataStream, int id, std::queue<std::string>&outputFiles) {
-	int iter = 0;
+void prep(uint64_t * const locBuf, std::ifstream & dataStream,const int id, std::queue<std::string>&outputFiles) {
+	const int iter = 0;
 	int file = 0;
 	while (!dataStream.eof()) {
 		std::unique_lock<std::mutex> lock(streamReadM);
@@ -42,23 +42,24 @@ void prep(uint64_t * locBuf, std::ifstream & dataStream, int id, std::queue<std:
 	}
 }
 
-void merge(std::string & str1, std::string & str2, uint64_t * buf, int id,int iter,int file, std::queue<std::string>&outputFiles) {
+void merge(const std::string & str1, const std::string & str2, uint64_t * const buf, const int id,const int iter,const int file,
+				std::queue<std::string>&outputFiles) {
 	std::ifstream f1(str1, std::ios::binary);
 	std::ifstream f2(str2, std::ios::binary);
-	std::string name = std::to_string(iter) + '_' + std::to_string(id) + '_' + std::to_string(file) + ".bin";
+	const std::string name = std::to_string(iter) + '_' + std::to_string(id) + '_' + std::to_string(file) + ".bin";
 	std::ofstream out(name, std::ios::binary);
 
-	size_t lim = threadUintLim / 4;
-	uint64_t* bufL = buf;
-	uint64_t* bufR = buf + lim;
-	uint64_t* bufM = bufR + lim;
+	const size_t lim = threadUintLim / 4;
+	uint64_t* const bufL = buf;
+	uint64_t* const bufR = buf + lim;
+	uint64_t* const bufM = bufR + lim;
 
 	f1.read(reinterpret_cast<char*>(bufL), lim * sizeof(uint64_t));
 	size_t redL = f1.gcount() / sizeof(uint64_t);
 	f2.read(reinterpret_cast<char*>(bufR), lim * sizeof(uint64_t));
 	size_t redR = f2.gcount() / sizeof(uint64_t);
 
-	size_t limM = 2 * lim;
+	const size_t limM = 2 * lim;
 	size_t l = 0;
 	size_t m = 0;
 	size_t r = 0;
@@ -112,8 +113,8 @@ void merge(std::string & str1, std::string & str2, uint64_t * buf, int id,int it
 	outputFiles.push(name);
 }
 
-void MTSort(uint64_t * buf, std::ifstream & dataStream, int id, std::queue<std::string>&outputFiles) {
-	uint64_t * locBuf = buf + id*threadUintLim;
+void MTSort(std::shared_ptr<uint64_t> buf, std::ifstream & dataStream, const int id, std::queue<std::string>&outputFiles) {
+	uint64_t * const locBuf = buf.get() + id*threadUintLim;
 	int iter = 0;
 	int file = 0;
 	
@@ -127,8 +128,7 @@ void MTSort(uint64_t * buf, std::ifstream & dataStream, int id, std::queue<std::
 		cond.wait(lock);
 	}
 	lock.unlock();
-	file = 0;
-	
+		
 	while (outputFiles.size() >= 2) {
 		std::unique_lock<std::mutex> qLock(outQueM);
 		if (outputFiles.size() >= 2) {
@@ -150,7 +150,7 @@ void MTSort(uint64_t * buf, std::ifstream & dataStream, int id, std::queue<std::
 }
 
 int main() {
-	uint64_t * buf = new uint64_t[memLim / sizeof(uint64_t)];
+	std::shared_ptr<uint64_t>  buf  (new uint64_t[memLim / sizeof(uint64_t)]);
 	std::ifstream dataStream(data, std::ios::binary);
 	std::queue<std::string> outputFiles;
 	std::vector<std::thread> threads;
@@ -160,7 +160,6 @@ int main() {
 	for (int i = 0; i < threadNum; ++i) {
 		threads[i].join();
 	}
-	delete[] buf;
 	system("pause");
 	return 0;
 }
