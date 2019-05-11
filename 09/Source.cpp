@@ -113,7 +113,7 @@ void merge(const std::string & str1, const std::string & str2, uint64_t * const 
 	outputFiles.push(name);
 }
 
-void MTSort(std::shared_ptr<uint64_t> buf, std::ifstream & dataStream, const int id, std::queue<std::string>&outputFiles) {
+void MTSort(std::unique_ptr<uint64_t>& buf, std::ifstream & dataStream, const int id, std::queue<std::string>&outputFiles) {
 	uint64_t * const locBuf = buf.get() + id*threadUintLim;
 	int iter = 0;
 	int file = 0;
@@ -150,7 +150,7 @@ void MTSort(std::shared_ptr<uint64_t> buf, std::ifstream & dataStream, const int
 }
 
 int main() {
-	std::shared_ptr<uint64_t>  buf  (new uint64_t[memLim / sizeof(uint64_t)]);
+	std::unique_ptr<uint64_t>  buf  (new uint64_t[memLim / sizeof(uint64_t)]);
 	std::ifstream dataStream(data, std::ios::binary);
 	std::queue<std::string> outputFiles;
 	std::vector<std::thread> threads;
